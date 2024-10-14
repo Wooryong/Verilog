@@ -1,0 +1,7 @@
+set_property SRC_FILE_INFO {cfile:C:/Verilog_lab/my_and/my_and.srcs/constrs_1/new/my_and.xdc rfile:../../../my_and.srcs/constrs_1/new/my_and.xdc id:1} [current_design]
+set_property src_info {type:XDC file:1 line:1 export:INPUT save:INPUT read:READ} [current_design]
+set_property PACKAGE_PIN D20 [get_ports A]
+set_property src_info {type:XDC file:1 line:2 export:INPUT save:INPUT read:READ} [current_design]
+set_property PACKAGE_PIN D19 [get_ports B]
+set_property src_info {type:XDC file:1 line:3 export:INPUT save:INPUT read:READ} [current_design]
+set_property PACKAGE_PIN L15 [get_ports R]
