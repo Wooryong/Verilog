@@ -43,4 +43,5 @@ always #(CLK_PER / 2) clk = ~clk; // CLK аж╠Б 100 ms
 // forever #(clk_Period / 2) clk = ~clk;
 
 
+
 endmodule

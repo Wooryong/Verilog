@@ -21,6 +21,7 @@
 
 
 module my_FSM_Security(
+    (* MARK_DEBUG = "true" *)
     input [1:0] KEY,
     input DOOR, WINDOW, // input [1:0] SENSOR,
     input CLK, RST,
@@ -51,15 +52,23 @@ module my_FSM_Security(
     // 7-Segment 출력 위한 10 ms tick 신호 필요
     // wait_delay state 5초 시간 측정 필요  
     
-    reg [1:0] current_state, next_state; // FSM Current & Next States
+    (* MARK_DEBUG = "true" *)
+    reg [1:0] current_state; 
+    reg [1:0] next_state; // FSM Current & Next States
     reg [1:0] state; // for 7-Segment 
     
+    (* MARK_DEBUG = "true" *)
     wire [1:0] SENSOR;  
     assign SENSOR = { DOOR , WINDOW };   
+    
+    (* MARK_DEBUG = "true" *)
     reg start_count;
+    (* MARK_DEBUG = "true" *)
     wire count_done; // reg count_done;
-              
-    reg [31:0] CNT_Seg; // 10 ms 간격 Toggle  
+    
+    (* MARK_DEBUG = "true" *)          
+    reg [31:0] CNT_Seg; // 10 ms 간격 Toggle 
+    (* MARK_DEBUG = "true" *) 
     reg [31:0] CNT_Wait; // Delay Check for 5s 
     
 	// State Representation by 7-Segment  
@@ -115,11 +124,11 @@ module my_FSM_Security(
     // Initialization - Start State 
     always @(posedge CLK)
     begin
-        if (RST)    current_state <= disarmed;
-        else        current_state <= next_state;                
+        if ( RST == 1'b1 )  current_state <= disarmed;
+        else                current_state <= next_state;                
     end // always @(posedge CLK)
 
-     // 각 Current_state에서 외부 Input(SW)에 따른 State Transition 조건 및 Output (LED)
+     // 각 Current_state에서 외부 Input(SW)에 따른 State Transition 조건 및 Output (ALARM, State)
     always @(current_state, KEY, SENSOR, count_done)
     begin
         ALARM = 1'b0; start_count = 1'b0;

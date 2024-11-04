@@ -21,52 +21,49 @@
 
 
 module my_1sec(
-    input RST,
-    input CLK,
+    input RST,CLK,
     output reg LED,
+    (* MARK_DEBUG="true" *)
     output reg [7:0] Segment //
     );
     
     parameter CLK_FREQ = 125_000_000; // 125 MHz SYSCLK 
-        
+    
+    (* MARK_DEBUG="true" *) // 그 다음 ; 까지 Debug Net    
     reg [31:0] CNT; // 내부 32-bit 저장공간     
+    (* MARK_DEBUG="true" *)
     reg enable; 
     reg [3:0] SW;
-      
+   
+    // 1초마다 enable 신호 Posedge 발생       
     always @(posedge CLK)
     begin
         if (RST == 1'b1)   
             begin
-                CNT <= 32'b0;
-                enable <= 1'b0;
-                // LED <= 1'b0;
+                CNT <= 32'b0; enable <= 1'b0;
             end    
         else // RST == 1'b0
             begin
                 if (CNT < CLK_FREQ - 1) // if (CNT < (CLK_FREQ) )  
                     begin
-                        CNT <= CNT + 1'b1;
-                        enable <= 1'b0;
+                        CNT <= CNT + 1'b1; enable <= 1'b0;
                     end
                 else // CNT == CLK_FREQ - 1                   
                     begin
-                        CNT <= 32'b0;   
-                        enable <= 1'b1;
+                        CNT <= 32'b0; enable <= 1'b1;
                     end
             end    
-    end // always begin-end
-   
+    end // always @(posedge CLK)
+       
     initial LED = 1'b0; // V
     initial SW = 4'b0;
     always @(posedge CLK) // always @(enable) << 안됨 
     begin       
         if (enable == 1'b1) 
             begin
-                LED <= ~LED; 
-                SW <= SW + 1'b1;
+                LED <= ~LED; SW <= SW + 1'b1;
                 
-                if (SW > 15)
-                    SW <= 4'b0;   
+                if (SW > 15) SW <= 4'b0;   
            end         
     end
     
