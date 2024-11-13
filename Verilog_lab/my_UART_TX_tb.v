@@ -39,22 +39,35 @@ begin
     #(CLK_PD * 5); btn1 = 1'b0; #(CLK_PD * 5); 
     #(CLK_PD * 5); // 
     
-    // State Change : START > TX > IDLE
+    // State Change : START > TX > STOP
     btn1 = 1'b1; 
     #(CLK_PD * 5); btn1 = 1'b0; #(CLK_PD * 5); 
-    #(CLK_PD * 100);
+    #(CLK_PD * 120);
     
-    
+    /*
+    // State Change : STOP > IDLE
+    btn1 = 1'b1; 
+    #(CLK_PD * 5); btn1 = 1'b0; #(CLK_PD * 5); 
+    #(CLK_PD * 5); //   
+    */
+         
     sw = 4'b0010;  
     // State Change : IDLE > START
     btn1 = 1'b1; 
     #(CLK_PD * 5); btn1 = 1'b0; #(CLK_PD * 5); 
     #(CLK_PD * 5); // 
  
-     // State Change : START > TX > IDLE
+     // State Change : START > TX > STOP
     btn1 = 1'b1; 
     #(CLK_PD * 5); btn1 = 1'b0; #(CLK_PD * 5); 
-    #(CLK_PD * 100);   
+    #(CLK_PD * 120);   
+ 
+    /*
+    // State Change : STOP > IDLE
+    btn1 = 1'b1; 
+    #(CLK_PD * 5); btn1 = 1'b0; #(CLK_PD * 5); 
+    #(CLK_PD * 5); // 
+    */  
   
     $finish;
 end

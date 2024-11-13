@@ -1,19 +1,23 @@
 `timescale 1ns / 1ps
 
 module my_UART_TX(
+    (* MARK_DEBUG="true" *)
     input RST, CLK, // RST - BTN0, CLK - SYSCLK
+    (* MARK_DEBUG="true" *)
     input BTN1, // for Send (Idel > Start)
-    // input Parity_Sel,
     input [3:0] SW, // Din = 0100_XXXX
+    (* MARK_DEBUG="true" *)
     output Dout, // Dout
-    output LED_IDLE, LED_START, LED_TX, // LED Colors by State 
+    output LED_IDLE, LED_START, LED_STOP, // LED Colors by State
+    (* MARK_DEBUG="true" *) 
     output reg Busy // LED
     );
     
     // State Representation by LED 
     assign LED_IDLE = ( current_state == IDLE ); // LED0_R
     assign LED_START = ( current_state == START ); // LED0_G
-    assign LED_TX = ( current_state == TX ); // LED0_B
+    // assign LED_TX = ( current_state == TX ); // LED0_B
+    assign LED_STOP = ( current_state == STOP ); // LED0_B
       
     // Parameters
     parameter CLK_FREQ = 125_000_000; // Use 125 MHz SYSCLK    
@@ -29,45 +33,52 @@ module my_UART_TX(
     // assign Parity_sel = 2'b10; // '00' : No Parity, '01' : Odd Parity, '10' : Even Parity                 
     assign Parity = (^Din); // 짝수개면 1'b0, 홀수개면 1'b1 
     
-  	// Generate Ready, Send Signal 
+  	// De-bounce Code for BTN
   	reg BTN1_chk1, BTN1_chk2; 
-  	reg BTN1_CNT;
-  	wire BTN1_press;
-  	wire Ready, Send;
-  	  	  	  	
-  	always @(posedge CLK) // always @(posedge CLK)
+  	(* MARK_DEBUG="true" *)
+  	wire BTN1_press;	  	  	
+  	always @(posedge CLK) 
   	begin  
-        if ( RST == 1'b1 ) BTN1_CNT <= 1'b0; 
-        else // RST == 1'b0
-        begin
             BTN1_chk1 <= BTN1;
-            BTN1_chk2 <= BTN1_chk1;       
-            
-            if ( (current_state == START) && (BTN1_press == 1'b1) )
-            begin
-                BTN1_CNT <= ~BTN1_CNT;
-            end
-            else if ( current_state != START )
-                BTN1_CNT <= 1'b0;                  
-        end               	
+            BTN1_chk2 <= BTN1_chk1;                            	
   	end 
- 
   	assign BTN1_press = BTN1_chk1 & ~BTN1_chk2; 
-  	assign Ready = (current_state == IDLE) & BTN1_press;	
-  	assign Send = Bit_CLK & (BTN1_CNT == 1'b1) ;
+  	//
   	
-  	// assign Send = (current_state == START) & Bit_CLK & ~BTN1_press;
-  	//    
-           
-    // Generate Busy
-    // Send Active > Busy Active
-    // Data Transfer End > Busy In-active
-    
+  	// Generate State Transition Signals 
+  	// Ready : IDLE to START
+  	// TX_start : START to TX
+  	// Standby : STOP to IDLE
+  	(* MARK_DEBUG="true" *)
+  	reg Ready_en, TX_start_en, Standby_en;
+  	(* MARK_DEBUG="true" *)
+  	wire Ready, TX_start, Standby; 	
+   	always @(posedge CLK) // always @(posedge CLK)
+  	begin  
+        if ( RST == 1'b1 ) 
+        begin
+            Ready_en <= 1'b0; TX_start_en <= 1'b0; Standby_en <= 1'b0;        
+        end 
+        else // RST == 1'b0
+        begin	
+            if ( (current_state == IDLE) && (BTN1_press == 1'b1) )          Ready_en <= 1'b1;
+            else if  ( (current_state == START) && (BTN1_press == 1'b1) )   TX_start_en <= 1'b1;  
+            else if  ( (current_state == STOP) && (BTN1_press == 1'b1) )    Standby_en <= 1'b1;
+            else if ( current_state == START )                              Ready_en <= 1'b0;  
+            else if ( current_state == TX )                                 TX_start_en <= 1'b0;
+            else if ( current_state == IDLE )                               Standby_en <= 1'b0;
+        end
+    end             	
+  	assign Ready = Ready_en & Bit_CLK;
+  	assign TX_start = TX_start_en & Bit_CLK;
+  	assign Standby = Standby_en & Bit_CLK;
+  	//   
+  	
  	// Generate Bit_CLK 
  	// 125_000_000 / 115_200 ~ 1085
 	reg [10:0] CNT_BAUD; // 11-bit CNT
-	
-	reg Bit_CLK; // 1 Posedge 
+	(* MARK_DEBUG="true" *)
+	reg Bit_CLK; // Baud Rate CLK
 	always @(posedge CLK)
 	begin
         if ( RST == 1'b1 ) begin
@@ -89,64 +100,88 @@ module my_UART_TX(
     localparam [1:0] // #State : 4 > 2-bit
         IDLE    = 2'b00,  
         START   = 2'b01,
-        TX      = 2'b10;    
-    //    STOP    = 2'b11;  
+        TX      = 2'b10,    
+        STOP    = 2'b11;  
     //        
         
     // FSM Current & Next State
-    // (* MARK_DEBUG="true" *)
+    (* MARK_DEBUG="true" *)
     reg [1:0] current_state, next_state; 
     // 
     
-    // 1 Frame (11-bit) : Stop - Parity - Bit7 - ... - Bit0 - Start >> '1' - Parity - Din - '0'   
-    reg [10:0] SR; // Shift Register for 11-bit 
+    // 
+    (* MARK_DEBUG="true" *)
+    wire [10:0] SR; // Shift Register for 11-bit 
+    (* MARK_DEBUG="true" *)
     reg [10:0] TX_data; // Temp. 
     assign Dout = TX_data[0]; // Dout = LSB of SR
-     
+    
+    (* MARK_DEBUG="true" *) 
     reg [3:0] CNT_TX;
-    reg TX_end;          
+    (* MARK_DEBUG="true" *)
+    reg Send, TX_end; 
+    (* MARK_DEBUG="true" *)   
+    reg Load, Shift;    
+ 
+    // 1 Data Frame (11-bit) : Stop bit - Parity bit - Data - Start bit   
+    assign SR = (RST == 1'b1) || (current_state == IDLE) ? 11'b0 :
+                (Load == 1'b1) ? { 1'b1, Parity, Din, 1'b0 } : 11'b0;
+                         
     always @(posedge CLK)
     begin
-        if ( current_state == IDLE )
+        if ( (RST == 1'b1) || (current_state == IDLE) )
         begin
-            SR <= 11'b0; TX_data <= 11'b111_1111_1111;  
-            CNT_TX <= 4'b0; TX_end = 1'b0; Busy = 1'b0; 
+            TX_data <= 11'b111_1111_1111;  
+            CNT_TX <= 4'b0; TX_end <= 1'b0;  
         end    
-        // Update Shift Register      
-        else if ( current_state == START )
+        // Data Parallel Load in Shift Register      
+        else if ( Load == 1'b1 ) // in START state
         begin	
-            SR[0] <= 1'b0; // Start Bit      
-            SR[8:1] <= Din; // [8] MSB of Din - [1] LSB of Din
-            SR[9] <= Parity; // Parity Bit
-            SR[10] <= 1'b1; // Stop Bit
-            
-            Busy = 1'b1;
-            if ( Send == 1'b1 ) TX_data <= SR; // State Transition : START > TX 
+            if ( TX_start == 1'b1 ) TX_data <= SR; // State Transition : START > TX 
         end
-        
-        else if ( (current_state == TX) && (Bit_CLK == 1'b1) )
-        begin
-            TX_data <= { 1'b1, TX_data[10:1] }; 
-            
-            if ( CNT_TX == 10 ) 
+        // Data TX & Data Shift in Shift Register
+        else if ( Shift == 1'b1 ) // in TX state
+        begin          
+            if ( Bit_CLK == 1'b1 ) 
             begin
-                CNT_TX <= 4'b0; Busy <= 1'b0; TX_end = 1'b1;
-            end        
-            else CNT_TX <= CNT_TX + 1'b1;
+                TX_data <= { 1'b1, TX_data[10:1] };           
+                
+                if ( CNT_TX == 10 ) begin
+                    CNT_TX <= 4'b0; TX_end = 1'b1;
+                end        
+                else CNT_TX <= CNT_TX + 1'b1;                                        
+            end
+            else TX_end <= 1'b0;           
         end
     end
-       
+    
+    // Generate Send, Busy Signals
+    always @(posedge CLK)
+    begin
+        if ( (RST == 1'b1) || (current_state == IDLE) ) begin
+            Send <= 1'b0; Busy <= 1'b0;
+        end    
+        else
+        begin            
+            if ( TX_start == 1'b1 ) Send <= 1'b1; // START state & BTN (START to TX) 
+            else if ( (Send == 1'b1) && (current_state == TX) && (TX_end == 1'b0) ) Busy <= 1'b1; // TX state  
+            else if ( (current_state == TX) && (TX_end == 1'b1) ) Busy <= 1'b0; // TX state & TX Complete 
+            else if ( Busy == 1'b0 ) Send <= 1'b0;
+        end   
+    end
+         
     // Initialization - Start State 
     always @(posedge CLK)
     begin
         if ( RST == 1'b1 )  current_state <= IDLE;
         else                current_state <= next_state;                
-    end // always @(posedge CLK)   
+    end    
     // 
     
     // 각 Current_state에서 State Transition 조건 및 Output
-    always @(current_state, Ready, Send, TX_end)
-    begin           
+    always @(current_state, Ready, TX_start, TX_end, Send)
+    begin 
+        Load = 1'b0; Shift = 1'b0;
         case ( current_state )
         IDLE : // 2'b00
             // State Transition 조건
@@ -159,20 +194,30 @@ module my_UART_TX(
         START : // 2'b01
              // State Transition 조건
             begin
-                if ( Send == 1'b1 ) next_state = TX; // if ( BTN1 == 1'b1 ) next_state = TX;                 
-                else                next_state = START;  
+                if ( TX_start == 1'b1 ) next_state = TX; // if ( BTN1 == 1'b1 ) next_state = TX;                 
+                else                    next_state = START;  
                 // State Output (Event)  
+                Load = 1'b1;
                   
             end                       	
         TX : // 2'b10
             // State Transition 조건    
             begin
-                if ( TX_end == 1'b1 )   next_state = IDLE; // if ( BTN1 == 1'b1 ) next_state = START;    
-                // else if ( STOP )        next_state = STOP;             
-                else                    next_state = TX; 
-                            
+                // if ( TX_end == 1'b1 )   next_state = IDLE; 
+                if ( TX_end == 1'b1 )   next_state = STOP;             
+                else                    next_state = TX;                             
                 // State Output (Event)    
+                Shift = 1'b1;
                 
+            end                
+         STOP : // 2'b11
+            // State Transition 조건    
+            begin
+                if ( Send == 1'b0 )  next_state = IDLE; // if ( BTN1 == 1'b1 ) next_state = IDLE;  
+                // if ( Standby == 1'b1 )  next_state = IDLE;           
+                else                    next_state = STOP;                                                                 
+                // State Output (Event)    
+                            
             end                            
         default : next_state = IDLE;    
         endcase            
